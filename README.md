@@ -1,6 +1,6 @@
 # BigData_project
 
-Analyzing datasets and predicting results<br>
+Analyzing datasets and predicting results - Machine Learning<br>
 
 Group members:<br>
 
