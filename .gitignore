@@ -1,2 +1,6 @@
 docker-compose.yml
 data/train.csv
+data/slim_train.json
+misc/LinesObjectMapper/bin
+misc/LinesObjectMapper/obj
+.vscode
