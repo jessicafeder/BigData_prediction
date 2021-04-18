@@ -1,6 +1,13 @@
 docker-compose.yml
+
+# Ignore large files
 data/train.csv
 data/slim_train.json
+data/shifted_train.csv
+
+# .Net
 misc/LinesObjectMapper/bin
 misc/LinesObjectMapper/obj
+
+# IDE-data
 .vscode

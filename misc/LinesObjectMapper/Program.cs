@@ -11,96 +11,79 @@ namespace LinesObjectMapper
     {
         public static async Task Main(string[] args)
         {
-            User[] users = await CsvToObjects(@"data\slim_train.csv");
-            SaveJson(@"data\slim_train.json", users);   
+            Console.CursorVisible = false;
+
+            var startTime = DateTime.Now;
+
+            User[] users = await Mapper.CsvToObjects(@"data\train.csv");
+            await ShiftPriorQuestionValues(users);
+
+            SaveCsv(@"data\shifted_train.csv", users);
+
+            var stopTime = DateTime.Now;
+
+            Console.WriteLine("Elapsed time: [{0}]", (stopTime - startTime).ToString("hh\\:mm\\:ss"));   
         }
 
-        private static async Task<User[]> CsvToObjects(string path)
+        private static async Task ShiftPriorQuestionValues(IEnumerable<User> users)
         {
-            Line[] lines = File.ReadAllLines(path)[1..] // Exclude header
-                .Select(line => line.Split(','))
-                .Select(segments => new Line(segments))
-                .ToArray();
-
-            // Group users and lines
-            int[] distinctUserIds = lines.Select(line => line.UserId).Distinct().ToArray();
-            var userSegments = new Dictionary<int, ICollection<Line>>();
-            foreach (var line in lines)
-            {
-                int userId = line.UserId;
-
-                if (userSegments.ContainsKey(userId))
-                {
-                    userSegments[userId].Add(line);
-                }
-                else
-                {
-                    var list = new LinkedList<Line>();
-                    list.AddFirst(line);
-                    userSegments[userId] = list;
-                }
-            }
+            int userCount = users.Count();
+            int counter = 0;
 
             var tasks = new List<Task>();
 
-            var users = new List<User>();
-
-            // Keep track of progress
-            int userCount = userSegments.Count;
-            int i = 0;
-            foreach (var keyValuePair in userSegments)
+            foreach (var user in users)
             {
-                int userId = keyValuePair.Key;
-                ICollection<Line> lns = keyValuePair.Value;
+                tasks.Add(Task.Run(() => {
 
-                tasks.Add(Task.Run(() =>
-                {
-                    var distinctTaskContainerIds = lns.Select(line => line.TaskContainerId).Distinct();
-                    var questionBundles = new List<QuestionBundle>();
-                    foreach (int taskContainerId in distinctTaskContainerIds)
+                    QuestionBundle[] bundles = user.Bundles.ToArray();
+
+                    for (int i = 0; i < bundles.Length - 1; i++)
                     {
-                        var questionBundle = new QuestionBundle
-                        {
-                            Id = taskContainerId,
-                            Questions = new LinkedList<Question>()
-                        };
+                        var currentBundle = bundles[i];
+                        var currentQuestions = currentBundle.Questions.ToArray();
 
-                        foreach (var line in lns)
+                        var nextBundle = bundles[i + 1];
+                        var nextQuestions = nextBundle.Questions.ToArray();
+
+                        for (int k = 0; k < currentQuestions.Length; k++)
                         {
-                            if (line.TaskContainerId == taskContainerId)
-                            {
-                                questionBundle.Questions.Add(new Question
-                                {
-                                    Id = line.ContentId,
-                                    AnsweredCorrectly = line.AnsweredCorrectly,
-                                    ElapsedTime = line.PriorQuestionElapsedTime,
-                                    HadExplanation = line.PriorQuestionHadExplanation
-                                });
-                            }
+                            var q = nextQuestions.First();
+                            currentQuestions[k].ElapsedTime = q.ElapsedTime;
+                            currentQuestions[k].HadExplanation = q.HadExplanation;
                         }
 
-                        questionBundles.Add(questionBundle);
+                        bundles[i].Questions = currentQuestions;
                     }
 
-                    users.Add(new User
+                    int lastIndex = bundles.Length - 1;
+                    var lastQuestions = bundles[lastIndex].Questions.ToArray();
+                    for (int i = 0; i < lastQuestions.Length; i++)
                     {
-                        Id = userId,
-                        Bundles = questionBundles
-                    });
+                        lastQuestions[i].ElapsedTime = null;
+                        lastQuestions[i].HadExplanation = null;
+                    }
 
-                    i++;
+                    bundles[lastIndex].Questions = lastQuestions;
+                    user.Bundles = bundles;
 
-                    Console.WriteLine($"{i}/{userCount}  -  ({userId})");
+                    counter++;
                 }));
             }
-            
-            await Task.WhenAll(tasks);
 
-            return users.OrderBy(user => user.Id).ToArray();
+            var runningTasks = Task.WhenAll(tasks);
+
+            while (!runningTasks.IsCompleted)
+            {
+                Console.WriteLine($"Shift {counter}/{userCount} ({(int)((float)counter / userCount * 100)}%)");
+                await Task.Delay(250);
+            }
+            Console.WriteLine($"Shift {counter}/{userCount} ({(int)((float)counter / userCount * 100)}%)");
         }
 
         private static void SaveJson(string path, IEnumerable<User> users)
         {
+            Console.WriteLine("Writing file...");
             using (var file = File.CreateText(path))
             {
                 foreach (var user in users)
@@ -111,6 +94,26 @@ namespace LinesObjectMapper
                     });
                     file.WriteLine(serialized);
                 }
+            }
+        }
+
+        private static void SaveCsv(string path, IEnumerable<User> users)
+        {
+            Console.WriteLine("Writing file...");
+            using (var file = File.CreateText(path))
+            {
+                file.WriteLine("user_id,content_id,task_container_id,answered_correctly,elapsed_time,had_explanation");
+                foreach (var user in users)
+                    foreach (var bundle in user.Bundles)
+                        foreach (var question in bundle.Questions)
+                            file.WriteLine("{0},{1},{2},{3},{4},{5}",
+                                user.Id,
+                                question.Id,
+                                bundle.Id,
+                                question.AnsweredCorrectly ? 1 : 0,
+                                question.ElapsedTime?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                                question.HadExplanation.HasValue ? question.HadExplanation.Value ? 1 : 0 : string.Empty
+                            );
             }
         }
     }

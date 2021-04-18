@@ -8,7 +8,7 @@ namespace LinesObjectMapper
         public int ContentId { get; set; }
         public int TaskContainerId { get; set; }
         public bool AnsweredCorrectly { get; set; }
-        public float PriorQuestionElapsedTime { get; set; }
+        public float? PriorQuestionElapsedTime { get; set; }
         public bool? PriorQuestionHadExplanation { get; set; }
 
         public Line(string[] values)
@@ -17,8 +17,8 @@ namespace LinesObjectMapper
             ContentId = int.Parse(values[1]);
             TaskContainerId = int.Parse(values[2]);
             AnsweredCorrectly = values[3] is "1";
-            PriorQuestionElapsedTime = float.Parse(values[4], System.Globalization.CultureInfo.InvariantCulture);
-            PriorQuestionHadExplanation = values[5] is "1" ? true : values[5] is "0" ? false : null;
+            PriorQuestionElapsedTime = values[4] == string.Empty ? null : float.Parse(values[4], System.Globalization.CultureInfo.InvariantCulture);
+            PriorQuestionHadExplanation = values[5] == string.Empty ? null : values[5] is "1" ? true : false;
         }
 
         public override string ToString() => 
