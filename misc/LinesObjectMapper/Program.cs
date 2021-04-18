@@ -11,14 +11,24 @@ namespace LinesObjectMapper
     {
         public static async Task Main(string[] args)
         {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Requires input and output path");
+                Console.WriteLine("Example: 'LinesObjectMapper path/to/input path/to/output'");
+                Environment.Exit(0);
+            }
+
+            string input = args[0];
+            string output = args[1];                
+
             Console.CursorVisible = false;
 
             var startTime = DateTime.Now;
 
-            User[] users = await Mapper.CsvToObjects(@"data\train.csv");
+            User[] users = await Mapper.CsvToObjects(input);
             await ShiftPriorQuestionValues(users);
 
-            SaveCsv(@"data\shifted_train.csv", users);
+            SaveCsv(output, users);
 
             var stopTime = DateTime.Now;
 
